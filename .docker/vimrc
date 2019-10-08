@@ -1,0 +1,10 @@
+call plug#begin('~/.vim/plugged')
+Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
+call plug#end()
+set tabstop=4
+set expandtab
+set shiftwidth=4
+set number
+set t_Co=256
+syntax on
+colo ron

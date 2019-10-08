@@ -1,0 +1,4 @@
+task_name: example-task-disabled
+schedule: "* * * * *"
+command: exit 1
+enabled: no
