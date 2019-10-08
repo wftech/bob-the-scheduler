@@ -27,7 +27,7 @@ type Config struct {
 	TaskDirectory   string
 	OutputDirectory string
 	Shell           string
-	HealthCheck     bool
+	HealthCheckPort int
 	Verbose         bool
 }
 
@@ -113,7 +113,7 @@ func init() {
 	flag.StringVar(&config.TaskDirectory, "c", "./example-tasks", "says where the tasks directory with YAML files is located")
 	flag.StringVar(&config.OutputDirectory, "o", "/var/spool/bob-the-scheduler", "where to save the jobs output")
 	flag.StringVar(&config.Shell, "sh", "/bin/sh", "shell path")
-	flag.BoolVar(&config.HealthCheck, "p", false, "provides healthcheck endpoint on http://localhost:8000/healhtz")
+	flag.IntVar(&config.HealthCheckPort, "p", 8000, "healthcheck port (e.g. http://localhost:8000/healhtz)")
 	flag.BoolVar(&config.Verbose, "v", false, "increase verbosity")
 	flag.Parse()
 }
@@ -128,10 +128,8 @@ func main() {
 		fmt.Fprintf(w, "tasks: %d", len(c.Entries()))
 	}
 
-	if config.HealthCheck {
-		http.HandleFunc("/healhtz", healthCheckHandler)
-		go http.ListenAndServe(":8000", nil)
-	}
+	http.HandleFunc("/healhtz", healthCheckHandler)
+	go http.ListenAndServe(fmt.Sprintf(":%d", config.HealthCheckPort), nil)
 
 	processTaskDirectory := func() {
 		for _, entry := range c.Entries() {
