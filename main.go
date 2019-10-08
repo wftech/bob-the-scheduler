@@ -9,18 +9,26 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/robfig/cron/v3"
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	OutputSuccess = iota
+	OutputFailure
+)
+
 type Task struct {
-	TaskName string `yaml:"task_name"`
-	Schedule string
-	Command  string
-	Enabled  bool
+	TaskName   string `yaml:"task_name"`
+	Schedule   string
+	Command    string
+	SaveOutput string `yaml:"save_output"`
+	Enabled    bool
 }
 
 type Config struct {
@@ -57,6 +65,7 @@ func getTasks(config Config) []Task {
 
 		var task Task
 		task.Enabled = true
+		task.SaveOutput = "on-failure,on-success"
 		err = yaml.Unmarshal(yamlFile, &task)
 		if err != nil {
 			continue
@@ -107,7 +116,56 @@ func watchDirectory(config Config, callback func()) {
 	<-done
 }
 
-var config Config
+func writeOutput(task Task, content, filename, outputDirectory string) {
+	taskDirectory := filepath.Join(outputDirectory, task.TaskName)
+	if _, err := os.Stat(taskDirectory); os.IsNotExist(err) {
+		err = os.MkdirAll(taskDirectory, os.ModePerm)
+		if err != nil {
+			log.Println("error:", err)
+			return
+		}
+	}
+	data := []byte(content)
+	err := ioutil.WriteFile(filepath.Join(taskDirectory, filename), data, 0644)
+	if err != nil {
+		log.Println("error:", err)
+	}
+}
+
+func notifyTaskStarted(task Task, outputDirectory string) {
+	ts := time.Now().String()
+	writeOutput(task, ts, "last-start", outputDirectory)
+}
+
+func notifyTaskSucceeded(task Task, outputDirectory string) {
+	ts := time.Now().String()
+	writeOutput(task, ts, "last-success", outputDirectory)
+}
+
+func notifyTaskFailed(task Task, outputDirectory string) {
+	ts := time.Now().String()
+	writeOutput(task, ts, "last-failure", outputDirectory)
+}
+
+func writeTaskOutput(task Task, outputType int, output, outputDirectory string) {
+	if outputType == OutputSuccess && !strings.Contains(task.SaveOutput, "on-success") {
+		return
+	}
+	if outputType == OutputFailure && !strings.Contains(task.SaveOutput, "on-failure") {
+		return
+	}
+
+	tsUnix := time.Now().Unix()
+	ts := time.Now().String()
+	content := fmt.Sprintf("%s\n%s", ts, output)
+	filename := fmt.Sprintf(outputFilePattern[outputType], tsUnix)
+	writeOutput(task, content, filename, outputDirectory)
+}
+
+var (
+	config            Config
+	outputFilePattern map[int]string
+)
 
 func init() {
 	flag.StringVar(&config.TaskDirectory, "c", "./example-tasks", "says where the tasks directory with YAML files is located")
@@ -116,6 +174,10 @@ func init() {
 	flag.IntVar(&config.HealthCheckPort, "p", 8000, "healthcheck port (e.g. http://localhost:8000/healhtz)")
 	flag.BoolVar(&config.Verbose, "v", false, "increase verbosity")
 	flag.Parse()
+
+	outputFilePattern = make(map[int]string)
+	outputFilePattern[OutputSuccess] = "stdout-%d.succeeded"
+	outputFilePattern[OutputFailure] = "stdout-%d.failed"
 }
 
 func main() {
@@ -157,12 +219,18 @@ func main() {
 					log.Printf("Starting task %s", currentTask.TaskName)
 				}
 
-				out, err := exec.Command(config.Shell, "-c", currentTask.Command).Output()
+				notifyTaskStarted(currentTask, config.OutputDirectory)
 
+				out, err := exec.Command(config.Shell, "-c", currentTask.Command).Output()
 				if err != nil {
+					notifyTaskFailed(currentTask, config.OutputDirectory)
+					writeTaskOutput(currentTask, OutputFailure, err.Error(), config.OutputDirectory)
 					log.Println("error:", err)
+				} else {
+					notifyTaskSucceeded(currentTask, config.OutputDirectory)
+					writeTaskOutput(currentTask, OutputSuccess, string(out), config.OutputDirectory)
+					log.Printf("[%s] output is:\n%s\n", currentTask.TaskName, out)
 				}
-				fmt.Printf("[%s] output is:\n%s\n", currentTask.TaskName, out)
 
 				if config.Verbose {
 					log.Printf("Ending task %s", currentTask.TaskName)

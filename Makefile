@@ -2,7 +2,7 @@ CWD=$(shell pwd)
 APP_USER=${USER}
 CONTAINER_NAME=bob-the-schuleder
 BIN_NAME=bob-the-schuleder
-RUN_ARGS=-v
+RUN_ARGS=-v -o=$(shell pwd)/logs
 
 default: binary
 
