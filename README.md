@@ -1,12 +1,14 @@
 # Bob the Scheduler 
 
-Bob the Scheduler is program used to schedule tasks. It plays nicely with Docker containers (or other containers) and 
-plays nicely with file-based configurations.
+Bob the Scheduler is program used to schedule tasks. It plays nicely with 
+Docker (or any other containers) and integrates with  file-based 
+configurations.
 
 Bob's mission is to provide application developers a convenient way to schedule repeating jobs. It is intended to be run as 
 PID 1 in container and spawn jobs.
 
-If you need more advanced tasks like running tasks in other container, check [Ofelia][ofelia] or [K8S cronjobs][k8s-cronjob].
+If you need more advanced tasks like running tasks in other container, 
+check [Ofelia][ofelia] or [K8S cronjobs][k8s-cronjob].
 
 ## How to use
 
@@ -43,7 +45,8 @@ Bob will periodically check new files in the config directory a and schedule its
 * `-p` provides healthcheck endpoint on http://localhost:8000/healhtz
 * `-v` increase verbosity
 
-The scheduling is done in UTC (at the moment).
+The scheduling is done in UTC, but you can use [CRON_TZ][cron-tz] syntax
+to schedule in any other zone.
 
 All the jobs are started with UID/GID of the calling user.
 
@@ -75,6 +78,7 @@ All the jobs are started with UID/GID of the calling user.
 * Set resource constraints (CPU/memory).
 * Report it's state through HTTP API.
 * Change UID/GID on execution.
+* Cleanup it's files.
 
 
 Patches are welcome. 
@@ -83,3 +87,4 @@ Patches are welcome.
 [ofelia]: https://github.com/mcuadros/ofelia
 [k8s-cronjob]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
 [go-cron]: https://godoc.org/github.com/robfig/cron
+[cron-tz]: https://godoc.org/github.com/robfig/cron#hdr-Time_zones
