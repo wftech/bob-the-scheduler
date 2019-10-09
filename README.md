@@ -27,9 +27,9 @@ save_output: on-failure,on-success
 
 ```!yaml
 # generate-images.yml
-task_name: generate-images
-schedule: "* * * * *"
-command: php /usr/local/www/cronjobs/generate-images.php
+task_name: update-images
+schedule: "CRON_TZ=Europe/Bratislava 12 01-07 * * *"
+command: php /usr/local/www/cronjobs/update-images.php
 ```
 
 ## How to start
@@ -75,11 +75,10 @@ All the jobs are started with UID/GID of the calling user.
 # What Bob does not do?
 
 * Mail reports on failures.
-* Set resource constraints (CPU/memory).
-* Report it's state through HTTP API.
+* Enforce resource constraints (CPU/memory).
+* Report tasks' state through HTTP API.
 * Change UID/GID on execution.
-* Cleanup it's files.
-
+* Cleanup its files.
 
 Patches are welcome. 
 
