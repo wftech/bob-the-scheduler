@@ -1,4 +1,4 @@
-module bob-the-schuleder
+module bob-the-scheduler
 
 go 1.13
 
