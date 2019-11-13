@@ -68,8 +68,8 @@ func getTasks(config Config) []Task {
 		task.SaveOutput = "on-failure,on-success"
 		err = yaml.Unmarshal(yamlFile, &task)
 		if err != nil {
-			continue
 			log.Fatal(err)
+			continue
 		}
 
 		tasks = append(tasks, task)
