@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	ps "github.com/mitchellh/go-ps"
 	"github.com/robfig/cron/v3"
 	"gopkg.in/yaml.v2"
 )
@@ -187,7 +188,14 @@ func main() {
 	c := cron.New()
 
 	healthCheckHandler := func(w http.ResponseWriter, req *http.Request) {
-		fmt.Fprintf(w, "tasks: %d", len(c.Entries()))
+		fmt.Fprintf(w, "tasks: %d\n", len(c.Entries()))
+		processes, err := ps.Processes()
+		if err != nil {
+			fmt.Fprintf(w, "processes: N/A\n")
+			log.Fatal(err)
+		} else {
+			fmt.Fprintf(w, "processes: %d\n", len(processes))
+		}
 	}
 
 	http.HandleFunc("/healhtz", healthCheckHandler)
