@@ -1,0 +1,14 @@
+FROM debian:buster-slim
+
+# `ps` & `top`
+RUN apt-get update
+RUN yes | apt-get upgrade
+RUN yes | apt-get install procps
+
+RUN mkdir -p /usr/local/bin
+RUN mkdir /tmp/logs
+
+ADD bob-the-scheduler /usr/local/bin/
+ADD example-tasks /tmp/example-tasks
+
+ENTRYPOINT ["/usr/local/bin/bob-the-scheduler", "-v", "-o=/tmp/logs", "-c=/tmp/example-tasks"]
