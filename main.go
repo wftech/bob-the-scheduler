@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -15,6 +16,9 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	ps "github.com/mitchellh/go-ps"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/robfig/cron/v3"
 	"gopkg.in/yaml.v2"
 )
@@ -52,7 +56,7 @@ func getTasks(config Config) []Task {
 	})
 
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 	for _, f := range files {
@@ -60,7 +64,7 @@ func getTasks(config Config) []Task {
 		yamlFile, err := ioutil.ReadFile(filename)
 
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 			continue
 		}
 
@@ -69,7 +73,14 @@ func getTasks(config Config) []Task {
 		task.SaveOutput = "on-failure,on-success"
 		err = yaml.Unmarshal(yamlFile, &task)
 		if err != nil {
-			log.Fatal(err)
+			promYAMLParseErrors.WithLabelValues(path.Base(f)).Inc()
+			log.Println(err)
+			continue
+		}
+
+		if len(task.Command) == 0 || len(task.Schedule) == 0 || len(task.TaskName) == 0 {
+			promYAMLParseErrors.WithLabelValues(path.Base(f)).Inc()
+			log.Println(fmt.Sprintf("Missing task attributes in %s", path.Base(f)))
 			continue
 		}
 
@@ -164,8 +175,16 @@ func writeTaskOutput(task Task, outputType int, output, outputDirectory string) 
 }
 
 var (
-	config            Config
-	outputFilePattern map[int]string
+	config              Config
+	outputFilePattern   map[int]string
+	promYAMLParseErrors = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "scheduler_yaml_parse_failure",
+		Help: "Malformed YAML file",
+	}, []string{"file_name"})
+	promJobParseErrors = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "scheduler_job_parse_failure",
+		Help: "Job parse error",
+	}, []string{"job_name"})
 )
 
 func init() {
@@ -192,13 +211,14 @@ func main() {
 		processes, err := ps.Processes()
 		if err != nil {
 			fmt.Fprintf(w, "processes: N/A\n")
-			log.Fatal(err)
+			log.Print(err)
 		} else {
 			fmt.Fprintf(w, "processes: %d\n", len(processes))
 		}
 	}
 
 	http.HandleFunc("/healhtz", healthCheckHandler)
+	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(fmt.Sprintf(":%d", config.HealthCheckPort), nil)
 
 	processTaskDirectory := func() {
@@ -248,6 +268,7 @@ func main() {
 			_, err := c.AddFunc(task.Schedule, callback)
 
 			if err != nil {
+				promJobParseErrors.WithLabelValues(task.TaskName).Inc()
 				log.Println("error:", err)
 			}
 		}
