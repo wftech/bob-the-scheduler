@@ -1,4 +1,4 @@
-FROM golang:1.13-buster
+FROM golang:1.22-bookworm
 
 ARG APP_USER
 
